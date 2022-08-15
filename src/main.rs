@@ -1,7 +1,16 @@
-use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
-use clap::{arg, command, value_parser, ArgAction, Command};
+use clap::{arg, Command};
+use serde_repr::{Serialize_repr, Deserialize_repr};
+
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
+#[repr(u8)]
+enum ShapeType {
+    Hexagon = 7,
+    Triangle = 8,
+    MiniTriangle = 9,
+    ShapesController = 12,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Value {
@@ -27,7 +36,7 @@ struct PanelPosition {
     x: Number,
     y: Number,
     o: Number,
-    shape_type: Number,
+    shape_type: ShapeType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -89,7 +98,7 @@ impl NanoleafClient {
         base_url: impl Into<String>,
     ) -> NanoleafClient {
         NanoleafClient {
-            client: client,
+            client,
             key: key.into(),
             base_url: base_url.into(),
         }
@@ -119,7 +128,7 @@ impl NanoleafClient {
 
         println!("{}", serde_json::to_string_pretty(&d).unwrap());
 
-        let res = self
+        self
             .client
             .put(format!(
                 "{}/{}/effects",
@@ -129,8 +138,6 @@ impl NanoleafClient {
             .json(&d)
             .send()
             .unwrap();
-
-            println!("{:?}", res);
     }
 
     fn get_effect(&self) -> String {
@@ -179,7 +186,9 @@ fn main() {
         format!("http://{}:{}/api/v1", hostname, port),
     );
     
-    println!("{:?}", nl.get_info());
+    let info = nl.get_info();
+    info.panel_layout.layout.position_data.iter().for_each(|p| println!("{:?}", p) );
+
     nl.turn_on();
     nl.write_command();
 
