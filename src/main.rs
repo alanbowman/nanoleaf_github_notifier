@@ -163,15 +163,20 @@ impl NanoleafClient {
 fn main() {
     let matches = Command::new("Nanoload Control")
         .arg(arg!(--api <API_KEY> "Nanoleaf API Key").required(true))
+        .arg(arg!(--host <HOSTNAME> "Hostname/IP").required(true))
+        .arg(arg!(--port <PORT> "Port").required(true).value_parser(clap::value_parser!(u16)))
         .get_matches();
 
     let api_key = matches.get_one::<String>("api").expect("required");
+    let hostname = matches.get_one::<String>("host").expect("required");
+    let port = matches.get_one::<u16>("port").expect("required");
+    
 
     let client = reqwest::blocking::Client::new();
     let nl = NanoleafClient::new(
         client,
         api_key,
-        "http://192.168.4.48:16021/api/v1",
+        format!("http://{}:{}/api/v1", hostname, port),
     );
     
     println!("{:?}", nl.get_info());
