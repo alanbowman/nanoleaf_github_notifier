@@ -1,7 +1,7 @@
+use clap::{arg, Command};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
-use clap::{arg, Command};
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
@@ -14,12 +14,12 @@ enum ShapeType {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Value {
-    value: bool
+    value: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct State {
-    on: Value
+    on: Value,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -75,14 +75,13 @@ struct EffectCommand {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct DisplayTempEffectSaved {
-    
     anim_name: String,
 }
 
 #[derive(Serialize, Debug)]
-#[serde(tag="command")]
+#[serde(tag = "command")]
 enum Commands {
-    displayTemp{ duration: u32, animName: String },
+    displayTemp { duration: u32, animName: String },
 }
 
 struct NanoleafClient {
@@ -120,7 +119,7 @@ impl NanoleafClient {
 
     fn write_command(&self) {
         let d: EffectCommand = EffectCommand {
-            write: Commands::displayTemp{
+            write: Commands::displayTemp {
                 duration: 5,
                 animName: "Northern Lights".to_owned(),
             },
@@ -128,13 +127,8 @@ impl NanoleafClient {
 
         println!("{}", serde_json::to_string_pretty(&d).unwrap());
 
-        self
-            .client
-            .put(format!(
-                "{}/{}/effects",
-                self.base_url,
-                self.key
-            ))
+        self.client
+            .put(format!("{}/{}/effects", self.base_url, self.key))
             .json(&d)
             .send()
             .unwrap();
@@ -152,16 +146,22 @@ impl NanoleafClient {
         effect
     }
 
-    fn turn_on( &self ) {
-        self.client.put(format!("{}/{}/state", self.base_url, self.key))
-            .json(&State{on: Value{ value:true }})
+    fn turn_on(&self) {
+        self.client
+            .put(format!("{}/{}/state", self.base_url, self.key))
+            .json(&State {
+                on: Value { value: true },
+            })
             .send()
             .unwrap();
     }
 
-    fn turn_off( &self ) {
-        self.client.put(format!("{}/{}/state", self.base_url, self.key))
-            .json(&State{on: Value{ value:false }})
+    fn turn_off(&self) {
+        self.client
+            .put(format!("{}/{}/state", self.base_url, self.key))
+            .json(&State {
+                on: Value { value: false },
+            })
             .send()
             .unwrap();
     }
@@ -171,13 +171,16 @@ fn main() {
     let matches = Command::new("Nanoload Control")
         .arg(arg!(--api <API_KEY> "Nanoleaf API Key").required(true))
         .arg(arg!(--host <HOSTNAME> "Hostname/IP").required(true))
-        .arg(arg!(--port <PORT> "Port").required(true).value_parser(clap::value_parser!(u16)))
+        .arg(
+            arg!(--port <PORT> "Port")
+                .required(true)
+                .value_parser(clap::value_parser!(u16)),
+        )
         .get_matches();
 
     let api_key = matches.get_one::<String>("api").expect("required");
     let hostname = matches.get_one::<String>("host").expect("required");
     let port = matches.get_one::<u16>("port").expect("required");
-    
 
     let client = reqwest::blocking::Client::new();
     let nl = NanoleafClient::new(
@@ -185,14 +188,18 @@ fn main() {
         api_key,
         format!("http://{}:{}/api/v1", hostname, port),
     );
-    
+
     let info = nl.get_info();
-    info.panel_layout.layout.position_data.iter().for_each(|p| println!("{:?}", p) );
+    info.panel_layout
+        .layout
+        .position_data
+        .iter()
+        .for_each(|p| println!("{:?}", p));
 
     nl.turn_on();
     nl.write_command();
 
     println!("{}", nl.get_effect());
-    
+
     nl.turn_off();
 }
