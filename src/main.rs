@@ -42,8 +42,8 @@ struct PanelPosition {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Layout {
-    num_panels: Number,
-    side_length: Number,
+    num_panels: u32,
+    side_length: u32,
     position_data: Vec<PanelPosition>,
 }
 
@@ -68,20 +68,26 @@ struct PanelInfo {
 }
 
 #[derive(Serialize, Debug)]
-struct EffectCommand {
-    write: Commands,
+struct HSB {
+    hue: u8,
+    saturation: u8,
+    brightness: u8,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct DisplayTempEffectSaved {
-    anim_name: String,
+struct WriteCommand {
+    write: EffectCommand,
 }
 
 #[derive(Serialize, Debug)]
-#[serde(tag = "command")]
-enum Commands {
-    displayTemp { duration: u32, animName: String },
+#[serde(rename_all = "camelCase")]
+struct EffectCommand {
+    command: String,
+    duration: Option<i32>,
+    anim_type: Option<String>,
+    palette: Option<Vec<HSB>>,
+    color_type: Option<String>,
 }
 
 struct NanoleafClient {
@@ -118,20 +124,30 @@ impl NanoleafClient {
     }
 
     fn write_command(&self) {
-        let d: EffectCommand = EffectCommand {
-            write: Commands::displayTemp {
-                duration: 5,
-                animName: "Northern Lights".to_owned(),
+        let d: WriteCommand = WriteCommand {
+            write: EffectCommand {
+                command: "displayTemp".to_string(),
+                anim_type: Some("solid".to_string()),
+                color_type: Some("HSB".to_string()),
+                duration: Some(5),
+                palette: Some(vec![HSB {
+                    hue: 240,
+                    saturation: 100,
+                    brightness: 100,
+                }]),
             },
         };
 
         println!("{}", serde_json::to_string_pretty(&d).unwrap());
 
-        self.client
+        let response = self
+            .client
             .put(format!("{}/{}/effects", self.base_url, self.key))
             .json(&d)
             .send()
             .unwrap();
+
+        println!("{:?}", response);
     }
 
     fn get_effect(&self) -> String {
