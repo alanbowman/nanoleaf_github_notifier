@@ -1,187 +1,13 @@
+mod github;
+pub mod nanoleaf;
+mod notification;
+
 use clap::{arg, Command};
-use serde::{Deserialize, Serialize};
-use serde_json::Number;
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use github::GithubClient;
+use nanoleaf::NanoleafClient;
+use notification::Notification;
 
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
-#[repr(u8)]
-enum ShapeType {
-    Hexagon = 7,
-    Triangle = 8,
-    MiniTriangle = 9,
-    ShapesController = 12,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Value {
-    value: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct State {
-    on: Value,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct Effects {
-    effects_list: Vec<String>,
-    select: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct PanelPosition {
-    panel_id: Number,
-    x: Number,
-    y: Number,
-    o: Number,
-    shape_type: ShapeType,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct Layout {
-    num_panels: u32,
-    side_length: u32,
-    position_data: Vec<PanelPosition>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PanelLayout {
-    // globalOrientation:
-    layout: Layout,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct PanelInfo {
-    name: String,
-    serial_no: String,
-    manufacturer: String,
-    firmware_version: String,
-    hardware_version: String,
-    model: String,
-    effects: Effects,
-    // firmwareUpgrade: ???
-    panel_layout: PanelLayout,
-}
-
-#[derive(Serialize, Debug)]
-struct HSB {
-    hue: u8,
-    saturation: u8,
-    brightness: u8,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct WriteCommand {
-    write: EffectCommand,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct EffectCommand {
-    command: String,
-    duration: Option<i32>,
-    anim_type: Option<String>,
-    palette: Option<Vec<HSB>>,
-    color_type: Option<String>,
-}
-
-struct NanoleafClient {
-    client: reqwest::blocking::Client,
-    key: String,
-    base_url: String,
-}
-
-impl NanoleafClient {
-    fn new(
-        client: reqwest::blocking::Client,
-        key: impl Into<String>,
-        base_url: impl Into<String>,
-    ) -> NanoleafClient {
-        NanoleafClient {
-            client,
-            key: key.into(),
-            base_url: base_url.into(),
-        }
-    }
-
-    fn get_info(&self) -> PanelInfo {
-        let body = self
-            .client
-            .get(format!("{}/{}", self.base_url, self.key))
-            .send()
-            .unwrap()
-            .text()
-            .unwrap();
-
-        let info: PanelInfo = serde_json::from_str(&body).unwrap();
-
-        info
-    }
-
-    fn write_command(&self) {
-        let d: WriteCommand = WriteCommand {
-            write: EffectCommand {
-                command: "displayTemp".to_string(),
-                anim_type: Some("solid".to_string()),
-                color_type: Some("HSB".to_string()),
-                duration: Some(5),
-                palette: Some(vec![HSB {
-                    hue: 240,
-                    saturation: 100,
-                    brightness: 100,
-                }]),
-            },
-        };
-
-        println!("{}", serde_json::to_string_pretty(&d).unwrap());
-
-        let response = self
-            .client
-            .put(format!("{}/{}/effects", self.base_url, self.key))
-            .json(&d)
-            .send()
-            .unwrap();
-
-        println!("{:?}", response);
-    }
-
-    fn get_effect(&self) -> String {
-        let effect: String = self
-            .client
-            .get(format!("{}/{}/effects/select", self.base_url, self.key))
-            .send()
-            .unwrap()
-            .text()
-            .unwrap();
-
-        effect
-    }
-
-    fn turn_on(&self) {
-        self.client
-            .put(format!("{}/{}/state", self.base_url, self.key))
-            .json(&State {
-                on: Value { value: true },
-            })
-            .send()
-            .unwrap();
-    }
-
-    fn turn_off(&self) {
-        self.client
-            .put(format!("{}/{}/state", self.base_url, self.key))
-            .json(&State {
-                on: Value { value: false },
-            })
-            .send()
-            .unwrap();
-    }
-}
+use std::{thread::sleep, time::Duration};
 
 fn main() {
     let matches = Command::new("Nanoload Control")
@@ -192,18 +18,15 @@ fn main() {
                 .required(true)
                 .value_parser(clap::value_parser!(u16)),
         )
+        .arg(arg!(--githubapi <API_KEY> "Github API key").required(true))
         .get_matches();
 
     let api_key = matches.get_one::<String>("api").expect("required");
     let hostname = matches.get_one::<String>("host").expect("required");
     let port = matches.get_one::<u16>("port").expect("required");
+    let ghapi = matches.get_one::<String>("githubapi").expect("required");
 
-    let client = reqwest::blocking::Client::new();
-    let nl = NanoleafClient::new(
-        client,
-        api_key,
-        format!("http://{}:{}/api/v1", hostname, port),
-    );
+    let nl = NanoleafClient::new(api_key, format!("http://{}:{}/api/v1", hostname, port));
 
     let info = nl.get_info();
     info.panel_layout
@@ -212,10 +35,29 @@ fn main() {
         .iter()
         .for_each(|p| println!("{:?}", p));
 
-    nl.turn_on();
-    nl.write_command();
+    //nl.turn_on();
+    //nl.write_command();
 
     println!("{}", nl.get_effect());
 
-    nl.turn_off();
+    // nl.turn_off();
+
+    nl.notify();
+
+    let mut gh = GithubClient::new(ghapi);
+
+    for _attempts in 0..10 {
+        let notifications_result = gh.check_for_notifications();
+
+        if let Ok((n, d)) = notifications_result {
+            if n > 0 {
+                // trigger notification
+                nl.notify();
+            }
+            // should use rate limiting here
+            sleep(d);
+        } else {
+            sleep(Duration::from_secs(60));
+        }
+    }
 }
