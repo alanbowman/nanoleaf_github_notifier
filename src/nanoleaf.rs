@@ -85,7 +85,7 @@ pub enum ColorType {
 }
 
 #[derive(Serialize, Debug)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum AnimType {
     Solid,
     Static,
@@ -100,7 +100,11 @@ pub enum AnimType {
 }
 
 #[derive(Serialize, Debug)]
-#[serde(rename_all_fields = "camelCase", rename_all = "camelCase", tag = "command")]
+#[serde(
+    rename_all_fields = "camelCase",
+    rename_all = "camelCase",
+    tag = "command"
+)]
 pub enum EffectCommand {
     DisplayTemp {
         duration: i32,
