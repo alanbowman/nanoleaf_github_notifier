@@ -2,6 +2,7 @@ use reqwest::{
     header::{HeaderValue, ACCEPT, ETAG, IF_NONE_MATCH, USER_AGENT},
     Error,
 };
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub struct GithubClient<'a> {
@@ -10,6 +11,9 @@ pub struct GithubClient<'a> {
     last_etag: Option<HeaderValue>,
     poll_interval: Option<HeaderValue>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+struct GithubNotification {}
 
 impl<'a> GithubClient<'a> {
     pub fn new(api_key: &'a str) -> GithubClient<'a> {
@@ -42,27 +46,23 @@ impl<'a> GithubClient<'a> {
 
         if response.status().is_success() {
             // get the number of notifications
-            let notifications: serde_json::Value = response.json().unwrap();
+            let body = response.text().unwrap();
+            let notifications: Vec<GithubNotification> = serde_json::from_str(&body).unwrap();
             println!("{notifications:#?}");
 
-            match notifications {
-                serde_json::Value::Array(n) => {
-                    let notification_count = n.len();
-                    println!("Got {notification_count} notifications");
+            let notification_count = notifications.len();
+            println!("Got {notification_count} notifications");
 
-                    let poll_interval = if self.poll_interval.is_none() {
-                        20
-                    } else {
-                        let poll_header = self.poll_interval.clone().unwrap();
+            let poll_interval = if self.poll_interval.is_none() {
+                20
+            } else {
+                let poll_header = self.poll_interval.clone().unwrap();
 
-                        // surely not...
-                        poll_header.to_str().unwrap().parse::<u64>().unwrap()
-                    };
+                // surely not...
+                poll_header.to_str().unwrap().parse::<u64>().unwrap()
+            };
 
-                    return Ok((notification_count, Duration::from_secs(poll_interval)));
-                }
-                _ => todo!("Different JSON types"),
-            }
+            return Ok((notification_count, Duration::from_secs(poll_interval)));
         }
 
         Ok((0, Duration::from_secs(20)))

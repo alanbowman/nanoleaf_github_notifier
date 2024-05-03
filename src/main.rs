@@ -37,16 +37,14 @@ fn main() {
 
     //nl.turn_on();
     //nl.write_command();
-
-    println!("{}", nl.get_effect());
-
+    //println!("{}", nl.get_effect());
     // nl.turn_off();
 
     nl.notify();
 
     let mut gh = GithubClient::new(ghapi);
 
-    for _attempts in 0..10 {
+    loop {
         let notifications_result = gh.check_for_notifications();
 
         if let Ok((n, d)) = notifications_result {
@@ -57,7 +55,7 @@ fn main() {
             // should use rate limiting here
             sleep(d);
         } else {
-            sleep(Duration::from_secs(60));
+            sleep(Duration::from_secs(20));
         }
     }
 }
